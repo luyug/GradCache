@@ -26,8 +26,10 @@ For development,
 pip install --editable .
 ```
 
-# Usage
-Gradient caching functionalities are implemented in `GradCache` class. The class's `__init__` method has several functional parameters `*_fn` for easy adjust of model behaviors. Alternatively you can also sub-class GradCache.
+## Usage
+Gradient caching functionalities are implemented in `GradCache` class. 
+
+- The class's `__init__` method defines the cache and has several functional parameters `*_fn` for easy adjust of model behaviors. Alternatively you can also sub-class GradCache.
 ```
 grad_cache.GradCache(  
   models: List[nn.Module],  
@@ -53,6 +55,8 @@ grad_cache.GradCache(
 
 **scaler** - A GradScaler object for automatic mixed precision training.
 
+- To run a cached gradient computatoin step, call `cache_step` function,
+
 ```
 cache_step(  
   *model_inputs,  
@@ -66,9 +70,9 @@ Run a single gradient cache step. Upon function return, updates are computed for
 
 **no_sync_except_last** - If True, under distributed setup, for each model, only trigger gradient reduction across processes for the last sub-batch's forward-backward pass. This could come in handy when dealing with a) large model, and/or b) non trivial number of sub-batches.
 
-**loss_kwargs** - Additional keyword arguments to the loss function `loss_fn`. This is intended to enable flexible loss computation (thanks to dynamic graph in Pytorch) such as reduction, weighting, etc. Potentially, using **loss_kwargs** you can incorporate outputs from those encoder models not tracked by the cache. 
+**loss_kwargs** - Additional keyword arguments to the loss function `loss_fn`. This is intended to enable flexible loss computation (thanks to dynamic graph in Pytorch) such as reduction, weighting, etc. Potentially, using `loss_kwargs` you can incorporate outputs from those encoder models not tracked by the cache. 
 
-**Retrun** - loss, the current steps loss scaler tensor (detached from the graph).
+**Return** - loss, the current steps loss scaler tensor (detached from the graph).
 
 ## Example Usage with Huggingface Transformers
 ### Learning a Bi-encoder
