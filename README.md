@@ -43,7 +43,7 @@ grad_cache.GradCache(
 
 **chunk_sizes** - An integer indicating chunk size. Or a list of integers of chunk size for each model. This controls for each model the sub-batch size to run forward-backward pass and should be set based on available GPU memory. A value too small will leave the GPU under utilized.
 
-**loss_fn** -  A loss function that takes arbitrary numbers of representation tensors and arbitrary numbers of keyword arguments as input. It should in no case modify the input representation  tensors' relations  in the autograd graph, which are later relied upon to create the gradient cache.
+**loss_fn** -  A loss function that takes representation tensors of number equal to number of models in `models` and arbitrary numbers of keyword arguments. It should compute loss based on the input tensors, and in no case modify the input tensors' relations in the autograd graph, which are later relied upon to create the gradient cache.
 
 **split_input_fn** - An optional function that split generic model input into chunks based on defined chunk_sizes. If not provided, this  class will try its best to split the inputs of supported types. See `split_inputs` function.
 
