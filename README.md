@@ -15,6 +15,7 @@ This repo holds a generic Pytorch implementation of Gradient Cache described in 
 }
 ```
 
+Gradient Cache has also been integrated into dense passage retrieval (DPR). Checkout our [GC-DPR toolkit](https://github.com/luyug/GC-DPR).
 ## Installation
 The package depends only on `pytorch>=1.6`.  To install, clone this repo and run pip.
 ```
