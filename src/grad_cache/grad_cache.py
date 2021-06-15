@@ -60,6 +60,8 @@ class GradCache:
         self.fp16 = fp16
         self.scaler = scaler
 
+        self._get_input_tensors_strict = False
+
     def __call__(self, *args, **kwargs):
         """
         Call the cache_step function.
@@ -79,40 +81,48 @@ class GradCache:
         if self.split_input_fn is not None:
             return self.split_input_fn(model_input, chunk_size)
 
-        if isinstance(model_input, (dict, UserDict)):
+        if isinstance(model_input, (dict, UserDict)) and all(isinstance(x, Tensor) for x in model_input.values()):
             keys = list(model_input.keys())
             chunked_tensors = [model_input[k].split(chunk_size, dim=0) for k in keys]
-            return [dict(zip(kk, vals)) for kk, vals in zip(repeat(keys), zip(*chunked_tensors))]
+            return [dict(zip(kk, tt)) for kk, tt in zip(repeat(keys), zip(*chunked_tensors))]
 
-        elif isinstance(model_input, list) and all(map(lambda v: isinstance(v, Tensor), model_input)):
+        elif isinstance(model_input, list) and all(isinstance(x, Tensor) for x in model_input):
             chunked_x = [t.split(chunk_size, dim=0) for t in model_input]
             return [list(s) for s in zip(*chunked_x)]
 
         elif isinstance(model_input, Tensor):
-            return model_input.split(chunk_size, dim=0)
+            return list(model_input.split(chunk_size, dim=0))
+
+        elif isinstance(model_input, tuple) and list(map(type, model_input)) == [list, dict]:
+            args_chunks = self.split_inputs(model_input[0], chunk_size)
+            kwargs_chunks = self.split_inputs(model_input[1], chunk_size)
+            return list(zip(args_chunks, kwargs_chunks))
 
         else:
-            raise ValueError
+            raise NotImplementedError(f'Model input split not implemented for type {type(model_input)}')
 
     def get_input_tensors(self, model_input) -> List[Tensor]:
         """
         Recursively go through model input and grab all tensors, which are then used to record current device random
-        states. This method will do its best to parse types of Tensor, list, dict and UserDict.
-
+        states. This method will do its best to parse types of Tensor, tuple, list, dict and UserDict. Other types will
+        be ignored unless self._get_input_tensors_strict is set to True, in which case an exception will be raised.
         :param model_input: input to model
         :return: all torch tensors in model_input
         """
         if isinstance(model_input, Tensor):
             return [model_input]
 
-        elif isinstance(model_input, list):
+        elif isinstance(model_input, (list, tuple)):
             return sum((self.get_input_tensors(x) for x in model_input), [])
 
         elif isinstance(model_input, (dict, UserDict)):
             return sum((self.get_input_tensors(x) for x in model_input.values()), [])
 
+        elif self._get_input_tensors_strict:
+            raise NotImplementedError(f'get_input_tensors not implemented for type {type(model_input)}')
+
         else:
-            raise NotImplementedError
+            return []
 
     def model_call(self, model: nn.Module, model_input):
         """
@@ -128,6 +138,9 @@ class GradCache:
                 return model(*model_input)
             elif isinstance(model_input, (dict, UserDict)):
                 return model(**model_input)
+            elif isinstance(model_input, tuple) and list(map(type, model_input)) == [list, dict]:
+                model_args, model_kwargs = model_input
+                return model(*model_args, **model_kwargs)
             else:
                 raise NotImplementedError
 
