@@ -1,5 +1,6 @@
 
 
+
 # Gradient Cache
 Gradient Cache is a simple technique for unlimitedly scaling contrastive learning batch far beyond GPU memory constraint. This means training that used to take heavy hardware, e.g. 8 V100 GPU, can be done on a single GPU. In addition, Gradient Cache allow users to replace big RAM GPU with much more cost efficient high FLOP low RAM cards.
 
@@ -28,8 +29,8 @@ pip install --editable .
 
 ## Usage
 Gradient caching functionalities are implemented in `GradCache` class. 
-
-- The class's `__init__` method defines the cache and has several functional parameters `*_fn` for easy adjust of model behaviors. Alternatively you can also sub-class GradCache.
+### Initialization
+The class's `__init__` method defines the cache and has several functional parameters `*_fn` for easy adjust of model behaviors. Alternatively you can also sub-class GradCache.
 ```
 grad_cache.GradCache(  
   models: List[nn.Module],  
@@ -55,7 +56,8 @@ grad_cache.GradCache(
 
 **scaler** - A GradScaler object for automatic mixed precision training.
 
-- To run a cached gradient computatoin step, call `cache_step` function,
+### Cache Gradient Step
+To run a cached gradient computatoin step, call `cache_step` function,
 
 ```
 cache_step(  
@@ -66,13 +68,27 @@ cache_step(
 ```
 Run a single gradient cache step. Upon function return, updates are computed for each model in `self.models` with gradient populated on the weights, as if the `model_inputs` are run as a huge single batch on sufficiently large hardware.  Calling an GradCache object with `__call__` will also invoke this function.
 
-**model_inputs** - Input to each encoder model. Should be in similar order as `self.models`.
+**model_inputs** - List of inputs to each encoder model. Should be in similar order as `self.models`.
 
 **no_sync_except_last** - If True, under distributed setup, for each model, only trigger gradient reduction across processes for the last sub-batch's forward-backward pass. This could come in handy when dealing with a) large model, and/or b) non trivial number of sub-batches.
 
 **loss_kwargs** - Additional keyword arguments to the loss function `loss_fn`. This is intended to enable flexible loss computation (thanks to dynamic graph in Pytorch) such as reduction, weighting, etc. Potentially, using `loss_kwargs` you can incorporate outputs from those encoder models not tracked by the cache. 
 
 **Return** - loss, the current steps loss scaler tensor (detached from the graph).
+
+### Natively Supported Input Types
+- x: Tensor - will be passed in as `model(x)`
+- x: List[Tensor] - will be passed in as `model(*x)`
+- x: Dict[str, Tensor] (or UserDict[str, Tensor]) - will be passed in as `model(**x)`
+- x: Tuple[List[Tensor], Dict[str, Tensor]] - will be passed in as `model(*x[0], **x[1])`
+
+Other generic input are not fully supported, we perform model call using the following heuristics,
+
+- x: List[Any] - will be passed in as `model(*x)`
+- x: Dict[str, Any] - will be passed in as `model(**x)`
+- x: Tuple[List[Any], Dict[str, Any]] - will be passed in as `model(*x[0], **x[1])`
+
+To run with them, `split_input_fn` should be specified during cache initialization to break these inputs  into smaller batches.  In some rare cases, you may also need to override  `get_input_tensors` when its heuristic can not grab enough tensors that covers all cuda devices that hold some tensors in the input.
 
 ## Example Usage with Huggingface Transformers
 ### Learning a Bi-encoder
@@ -136,6 +152,7 @@ gc = GradCache(
   get_rep_fn=lambda v: v.pooler_output
 )
 ```
+Under the hood, distinct hooks will be registered to make correct gradient computation.
 ### Distributed Training with Multiple GPUs?
 We expect cross process communication of representations to be handled by the `loss_fn`. 
 ```
