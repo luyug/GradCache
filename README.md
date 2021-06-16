@@ -196,7 +196,7 @@ A decorator that takes a model call function into a cached compatible version.
 
 **Return** - A function that returns 1) representation leaf tensors for cache construction, 2) a closure function for  the 2nd forward and the cached backward. Call 2) with 1) as argument after calling backward on the loss Tensor.
 ```
-grad_cache.functional.cat_input_tensor(func: Callable[..., Tensor])```
+grad_cache.functional.cat_input_tensor(func: Callable[..., Tensor])
 ```
 A decorator that concatenates positional and keyword arguments of type List[Tensor] into a single Tensor  on the 0th dimension. This can come in handy dealing with results of representation tensors from multiple  cached forward.  
 
