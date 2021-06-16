@@ -30,7 +30,7 @@ pip install --editable .
 ```
 
 ## Usage
-Gradient caching functionalities are implemented in `GradCache` class.  If you are developing a new project instead of patching an old one, also checkout our [functional approach](#functional-approach) for a effort reduced approach.
+Gradient caching functionalities are implemented in `GradCache` class.  If you are developing a **new project** instead of patching an old one, also checkout our [functional approach](#functional-approach) for a effort reduced approach.
 ### Initialization
 The class's `__init__` method defines the cache and has several functional parameters `*_fn` for easy adjust of model behaviors. Alternatively you can also sub-class GradCache.
 ```
