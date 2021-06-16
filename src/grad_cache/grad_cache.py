@@ -198,7 +198,8 @@ class GradCache:
         :return: A tuple of a) gradient cache for each encoder model, and b) loss tensor
         """
         reps = [r.detach().requires_grad_() for r in reps]
-        loss = self.compute_loss(*reps, **loss_kwargs)
+        with autocast() if self.fp16 else nullcontext():
+            loss = self.compute_loss(*reps, **loss_kwargs)
 
         if self.fp16:
             self.scaler.scale(loss).backward()
@@ -237,9 +238,7 @@ class GradCache:
                     y = self.model_call(model, x)
                 reps = self.get_reps(y)
 
-                # as we are manipulating gradients, use fp32
-                with autocast(False):
-                    surrogate = torch.dot(reps.float().flatten(), gradient.float().flatten())
+                surrogate = torch.dot(reps.flatten(), gradient.flatten())
                 surrogate.backward()
 
     def cache_step(
