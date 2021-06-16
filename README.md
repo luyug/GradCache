@@ -233,8 +233,8 @@ cache_y = []
 closures_x = []
 closures_y = []
 
-for step, batch in enumerate(loader):  
-    xx, yy = batch
+for step, sub_batch in enumerate(loader):  
+    xx, yy = sub_batch
     rx, cx = call_model(bert, xx)
     ry, cy = call_model(bert, yy)
     
