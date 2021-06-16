@@ -1,6 +1,7 @@
 
 
 
+
 # Gradient Cache
 Gradient Cache is a simple technique for unlimitedly scaling contrastive learning batch far beyond GPU memory constraint. This means training that used to take heavy hardware, e.g. 8 V100 GPU, can be done on a single GPU. In addition, Gradient Cache allow users to replace big RAM GPU with much more cost efficient high FLOP low RAM cards.
 
@@ -29,7 +30,7 @@ pip install --editable .
 ```
 
 ## Usage
-Gradient caching functionalities are implemented in `GradCache` class. 
+Gradient caching functionalities are implemented in `GradCache` class.  If you are developing a new project instead of patching an old one, also checkout our [functional approach](#functional-approach) for a effort reduced approach.
 ### Initialization
 The class's `__init__` method defines the cache and has several functional parameters `*_fn` for easy adjust of model behaviors. Alternatively you can also sub-class GradCache.
 ```
@@ -90,6 +91,7 @@ Other generic input are not fully supported, we perform model call using the fol
 - x: Tuple[List[Any], Dict[str, Any]] - will be passed in as `model(*x[0], **x[1])`
 
 To run with them, `split_input_fn` should be specified during cache initialization to break these inputs  into smaller batches.  In some rare cases, you may also need to override  `get_input_tensors` when its heuristic can not grab enough tensors that covers all cuda devices that hold some tensors in the input.
+
 
 ## Example Usage with Huggingface Transformers
 ### Learning a Bi-encoder
@@ -182,5 +184,80 @@ gc(xx, yy, no_sync_except_last=True, reduction='mean')
 ```
 Set `no_sync_except_last=True` to avoid unnecessary gradient reduction.
 
+## Functional Approach
+### Decorators
+If you are developing a new project, we recommend also checking out the decorators we have provided to create higher order functions for cache.
+```
+grad_cache.functional.cached(func: Callable[..., Tensor])
+```
+A decorator that takes a model call function into a cached compatible version.  
+
+**func** - A function that calls the model and return representation tensor.
+
+**Return** - A function that returns 1) representation leaf tensors for cache construction, 2) a closure function for  the 2nd forward and the cached backward. Call 2) with 1) as argument after calling backward on the loss Tensor.
+```
+grad_cache.functional.cat_input_tensor(func: Callable[..., Tensor])```
+```
+A decorator that concatenates positional and keyword arguments of type List[Tensor] into a single Tensor  on the 0th dimension. This can come in handy dealing with results of representation tensors from multiple  cached forward.  
+
+**func** - A loss function 
+
+**Return** -  Decorated loss function for cached results.
+
+### Usage
+The functional decorators are particular useful if you data loader is emitting small batches, from which you can construct the big batch. Say you also want to do automatic mixed precision, we first define the model call function and loss function,
+```
+from grad_cache.functional import cached, cat_input_tensor
+
+import torch
+import torch.nn.functional as F
+from torch.cuda.amp import autocast
+
+@cached
+@autocast()
+def  call_model(model, input):
+	return model(**input).pooler_output
+
+@cat_input_tensor
+@autocast()
+def  contrastive_loss(x, y):
+	target = torch.arange(0, y.size(0), int(y.size(0) / x.size(0)), device=x.device)
+	scores = torch.matmul(x, y.transpose(0, 1))
+	return F.cross_entropy(scores, target=target)
+```
+Say you have a DataLoader `loader` emitting small batches of tuple `(xx, yy)`  of size (M * N) and  that you want to train by aggregating 16 small batches to get a batch of (16M * 16N),
+
+```
+closuresx = []  
+repsx = []  
+closuresy = []  
+repsy = []  
+  
+for step, batch in enumerate(loader):  
+	xx, yy = batch
+    rx, cx = call_model(bert, xx)  
+    ry, cy = call_model(bert, yy)  
+    closuresx.append(cx)  
+    closuresy.append(cy)  
+    repsx.append(rx)  
+    repsy.append(ry)  
+    if (step + 1) % 16 == 0:  
+        loss = contrastive_loss(repsx, repsy)  
+        scaler.scale(loss).backward()
+        for f, r in zip(closuresx, repsx):
+            f(r)
+        for f, r in zip(closuresy, repsy):
+            f(r)
+        closuresx = []
+        repsx = []
+        closuresy = []
+        repsy = []
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
+``` 
+
 ## Code Structure
-The GradCache class is defined in [grad_cache.py](src/grad_cache/grad_cache.py). The code is under 300 lines including comments. For development, we encourage you to read through it.
+[grad_cache/grad_cache.py](src/grad_cache/grad_cache.py) - Define the GradCache class. The code is under 300 lines including comments. For development, we encourage you to read through it.
+
+[grad_cache/functional.py](src/grad_cache/grad_cache.py) - Define decorators to create higher order function for gradient caching from ordinary model call functions and loss functions.
