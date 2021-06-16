@@ -228,30 +228,35 @@ def  contrastive_loss(x, y):
 Say you have a DataLoader `loader` emitting small batches of tuple `(xx, yy)`  of size (M * N) and  that you want to train by aggregating 16 small batches to get a batch of (16M * 16N),
 
 ```
-closuresx = []  
-repsx = []  
-closuresy = []  
-repsy = []  
-  
+cache_x = []
+cache_y = []
+closures_x = []
+closures_y = []
+
 for step, batch in enumerate(loader):  
-	xx, yy = batch
-    rx, cx = call_model(bert, xx)  
-    ry, cy = call_model(bert, yy)  
-    closuresx.append(cx)  
-    closuresy.append(cy)  
-    repsx.append(rx)  
-    repsy.append(ry)  
-    if (step + 1) % 16 == 0:  
-        loss = contrastive_loss(repsx, repsy)  
+    xx, yy = batch
+    rx, cx = call_model(bert, xx)
+    ry, cy = call_model(bert, yy)
+    
+    cache_x.append(rx)
+    cache_y.append(ry)
+    closuresx.append(cx)
+    closuresy.append(cy)
+    
+    if (step + 1) % 16 == 0:
+        loss = contrastive_loss(cache_x, cache_y)
         scaler.scale(loss).backward()
-        for f, r in zip(closuresx, repsx):
+        
+	for f, r in zip(closuresx, cache_x):
             f(r)
-        for f, r in zip(closuresy, repsy):
+        for f, r in zip(closuresy, cache_y):
             f(r)
-        closuresx = []
-        repsx = []
-        closuresy = []
-        repsy = []
+
+        cache_x = []
+        cache_y = []
+        closures_x = []
+        closures_y = []
+	
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
