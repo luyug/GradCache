@@ -205,7 +205,7 @@ A decorator that concatenates positional and keyword arguments of type List[Tens
 **Return** -  Decorated loss function for cached results.
 
 ### Usage
-The functional decorators are particular useful if you data loader is emitting small batches, from which you can construct the big batch. Say you also want to do automatic mixed precision, we first define the model call function and loss function,
+The functional decorators are particular useful if your data loader is emitting small batches, from which you can construct the big batch. Say you also want to do automatic mixed precision, we first define the model call function and loss function,
 ```
 from grad_cache.functional import cached, cat_input_tensor
 
@@ -260,4 +260,4 @@ for step, batch in enumerate(loader):
 ## Code Structure
 [grad_cache/grad_cache.py](src/grad_cache/grad_cache.py) - Define the GradCache class. The code is under 300 lines including comments. For development, we encourage you to read through it.
 
-[grad_cache/functional.py](src/grad_cache/grad_cache.py) - Define decorators to create higher order function for gradient caching from ordinary model call functions and loss functions.
+[grad_cache/functional.py](src/grad_cache/functional.py) - Define decorators to create higher order function for gradient caching from ordinary model call functions and loss functions.
