@@ -1,4 +1,4 @@
-from typing import Iterable, Any, Callable
+from typing import Iterable, Any
 from functools import partial
 
 import jax
@@ -30,14 +30,14 @@ def cache_grad_scan_fn(f, params, acc, x):
     return acc, None
 
 
-def chunk_encode(encode_fn: Callable[..., Array]) -> Callable[..., Array]:
+def chunk_encode(encode_fn):
     def f(**xx):
         _, hh = jax.lax.scan(partial(encode_scan_fn, encode_fn), 0, xx)
         return hh
     return f
 
 
-def cache_grad(encode_fn: Callable[..., Any]) -> Callable[[Any, Array, Array, ...], Array]:
+def cache_grad(encode_fn):
     def f(params, grad_accumulator, cached_grad, **xx):
         grads, _ = jax.lax.scan(
             partial(cache_grad_scan_fn, encode_fn, params), grad_accumulator, [cached_grad, xx]
