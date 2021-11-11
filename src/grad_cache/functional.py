@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Callable
+from typing import Callable, Union, Tuple
 
 import torch
 from torch import Tensor
@@ -19,15 +19,26 @@ def cached(func: Callable[..., Tensor]):
         rnd_state = RandContext()
         with torch.no_grad():
             reps_no_grad = func(*args, **kwargs)
-        leaf_reps = reps_no_grad.detach().requires_grad_()
+        if isinstance(reps_no_grad, Tensor):
+            reps_no_grad = (reps_no_grad, )
+        else:
+            assert all(isinstance(v, Tensor) for v in reps_no_grad)
+        leaf_reps = tuple(t.detach().requires_grad_() for t in reps_no_grad)
 
         @wraps(func)
-        def forward_backward_func(cache_reps: Tensor):
+        def forward_backward_func(cache_reps: Union[Tensor, Tuple[Tensor]]):
             with rnd_state:
                 reps = func(*args, **kwargs)
-            surrogate = torch.dot(reps.flatten(), cache_reps.grad.flatten())
+            if isinstance(reps, Tensor):
+                reps = (reps,)
+            if isinstance(cache_reps, Tensor):
+                cache_reps = (cache_reps,)
+            assert len(reps) == len(cache_reps)
+
+            surrogate = sum(map(lambda u, v: torch.dot(u.flatten(), v.grad.flatten()), zip(reps, cache_reps)), 0)
             surrogate.backward()
-        return leaf_reps, forward_backward_func
+
+        return leaf_reps + (forward_backward_func,)
     return cache_func
 
 
