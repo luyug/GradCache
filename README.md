@@ -3,10 +3,10 @@
 
 
 # Gradient Cache
-Gradient Cache is a simple technique for unlimitedly scaling contrastive learning batch far beyond GPU memory constraint. This means training that used to take heavy hardware, e.g. 8 V100 GPU, can be done on a single GPU. In addition, Gradient Cache allow users to replace big RAM GPU with much more cost efficient high FLOP low RAM cards.
+Gradient Cache is a simple technique for unlimitedly scaling contrastive learning batch far beyond GPU/TPU memory constraint. This means training that used to take heavy hardware, e.g. 8 V100 GPU, can be done on a single GPU. In addition, Gradient Cache allow users to replace big RAM GPU/TPU with much more cost efficient high FLOP low RAM systems.
 
-This repo holds a generic Pytorch implementation of Gradient Cache described in our paper [Scaling Deep Contrastive Learning Batch Size under Memory Limited Setup
-](https://arxiv.org/abs/2101.06983).
+This repo holds a generic implementation of Gradient Cache described in our paper [Scaling Deep Contrastive Learning Batch Size under Memory Limited Setup
+](https://arxiv.org/abs/2101.06983). Both Pytorch and JAX frameworks are supported.
 ```
 @inproceedings{gao2021scaling,
      title={Scaling Deep Contrastive Learning Batch Size under Memory Limited Setup},
@@ -16,9 +16,11 @@ This repo holds a generic Pytorch implementation of Gradient Cache described in 
 }
 ```
 
+**NEW: We now support JAX and TPU!**
+
 Gradient Cache has also been integrated into dense passage retrieval (DPR). Checkout our [GC-DPR toolkit](https://github.com/luyug/GC-DPR).
 ## Installation
-The package depends only on `pytorch>=1.6`.  To install, clone this repo and run pip.
+First install your desired deep learning backend, either Pytorch or JAX.  To install GradCacge, clone this repo and run pip.
 ```
 git clone https://github.com/luyug/GradCache
 cd GradCache
@@ -30,7 +32,10 @@ pip install --editable .
 ```
 
 ## Usage
-Gradient caching functionalities are implemented in `GradCache` class.  If you are developing a **new project** instead of patching an old one, also checkout our [functional approach](#functional-approach) for a effort reduced approach.
+Gradient caching functionalities are implemented in `GradCache` class.  If you are developing a **new project** instead of patching an old one, also checkout our [functional approach](#functional-approach) for a effort reduced approach. 
+
+For JAX/Flax user, take a look at a simple train function [here](https://github.com/luyug/GradCache/blob/8463340a15a2395fc33b9a1f40f5f4946b7cbad8/src/grad_cache/cachex/training.py#L9).
+
 ### Initialization
 The class's `__init__` method defines the cache and has several functional parameters `*_fn` for easy adjust of model behaviors. Alternatively you can also sub-class GradCache.
 ```
