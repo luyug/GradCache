@@ -9,6 +9,5 @@ setup(
     license='Apache-2.0',
     author='Luyu Gao',
     author_email='luyug@cs.cmu.edu',
-    install_requires=['torch>=1.6.0'],
     description=''
 )
