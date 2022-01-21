@@ -1,8 +1,9 @@
 from functools import wraps
-from typing import Callable, Union, Tuple
+from typing import Callable, Union, Tuple, Any
 
 import torch
 from torch import Tensor
+from torch import distributed as dist
 
 from .context_managers import RandContext
 
@@ -63,3 +64,28 @@ def cat_input_tensor(func: Callable[..., Tensor]):
         kwargs_cat = dict((k, _cat_tensor_list(v)) for k, v in kwargs.values())
         return func(*args_cat, **kwargs_cat)
     return cat_f
+
+
+def _maybe_gather_tensor(t: Any, axis: int):
+    if not isinstance(t, Tensor):
+        return t
+    gathered = [torch.empty_like(t) for _ in range(dist.get_world_size())]
+    dist.all_gather(gathered, t)
+    gathered[dist.get_rank()] = t
+    return torch.cat(gathered, dim=axis)
+
+
+def gather_input_tensor(func: Callable[..., Tensor], axis=0):
+    """
+    A decorator that all-gather positional and keyword arguments of type Tensor and concatenate them on axis.
+    Intended to be used with distributed contrastive learning loss.
+    :param func: A loss function
+    :param axis: The axis the gathered tensors are concatenated.
+    :return: Decorated loss function for distributed training.
+    """
+    @wraps(func)
+    def f(*args, **kwargs):
+        args_gathered = [_maybe_gather_tensor(x, axis=axis) for x in args]
+        kwargs_gathered = dict((k, _maybe_gather_tensor(v, axis=axis)) for k, v in kwargs.values())
+        return func(*args_gathered, **kwargs_gathered)
+    return f
