@@ -20,7 +20,7 @@ This repo holds a generic implementation of Gradient Cache described in our pape
 
 Gradient Cache has also been integrated into dense passage retrieval (DPR). Checkout our [GC-DPR toolkit](https://github.com/luyug/GC-DPR).
 ## Installation
-First install your desired deep learning backend, either Pytorch or JAX.  To install GradCacge, clone this repo and run pip.
+First install your desired deep learning backend, either Pytorch or JAX.  To install GradCache, clone this repo and run pip.
 ```
 git clone https://github.com/luyug/GradCache
 cd GradCache
@@ -113,7 +113,7 @@ texts = [
 
 Initialize our encoder models,
 ```
-from transformers import AutoTokenizer, TFAutoModel
+from transformers import AutoTokenizer, AutoModel
 tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 encoder1 = AutoModel.from_pretrained("bert-base-uncased").cuda()
 encoder2 = AutoModel.from_pretrained("bert-base-uncased").cuda()
@@ -209,6 +209,14 @@ A decorator that concatenates positional and keyword arguments of type List[Tens
 
 **Return** -  Decorated loss function for cached results.
 
+```
+grad_cache.functional.gather_input_tensor(func: Callable[..., Tensor], axis=0)
+```
+A decorator that all-gather positional and keyword arguments of type Tensor and concatenate them on axis. Intended to be used to create distributed contrastive learning loss.
+
+**func** - A loss function 
+
+**Return** -  Decorated loss function for distributed training.
 ### Usage
 The functional decorators are particular useful if your data loader is emitting small batches, from which you can construct the big batch. Say you also want to do automatic mixed precision, we first define the model call function and loss function,
 ```
@@ -266,7 +274,29 @@ for step, sub_batch in enumerate(loader):
         scaler.update()
         optimizer.zero_grad()
 ``` 
+### Distributed Training
+Running distributed multi-process training requires: 1) (all-)gather representations across devices and 2) (all-reduce) gradients across devices. Both steps will happen **outside** the cached decorated funtions. 
 
+The latter is easy to achieve by wrapping encoders, e.g. a `bert`, in `DistributedDataParallel`.
+```
+bert = DistributedDataParallel(
+	bert, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
+```
+
+The former requires extra distributed ops in the loss function, which should be done according the original loss definition. For example,
+```
+from torch import distributed as dist
+from grad_cache.functional import cat_input_tensor, gather_input_tensor
+
+@cat_input_tensor
+@gather_input_tensor
+@autocast()
+def contrastive_loss(x, y):
+    target = torch.arange(0, y.size(0), int(y.size(0) / x.size(0)), device=x.device)
+    scores = torch.matmul(x, y.transpose(0, 1))
+    # scale the loss as DistributedDataParallel will do mean reduce
+    return F.cross_entropy(scores, target=target) * dist.get_world_size()  
+```
 ## Code Structure
 [grad_cache/grad_cache.py](src/grad_cache/grad_cache.py) - Define the GradCache class. The code is under 300 lines including comments. For development, we encourage you to read through it.
 
