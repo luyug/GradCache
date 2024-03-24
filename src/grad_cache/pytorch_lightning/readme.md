@@ -6,7 +6,10 @@ This is an experimental folder to provide example of using Grad Cache with PyTor
 
 ### Installation
 
+After GradCache is installed, do
+
 ```
+cd GradCache/src/grad_cache/pytorch_lightning
 python -m venv plgc
 . ./plgc/bin/activate
 pip3 install -U pip
@@ -25,6 +28,8 @@ python pl_example.py --gpus 1 --batch_size 16 --use_gc --gc_minibatch_size 2
 # 2-gpus, gradcache
 python pl_example.py --gpus 2 --batch_size 8 --use_gc --gc_minibatch_size 2
 ```
+
+Optionally, do mix-precision training with `--precision 16`, run different ddp_backend with `--ddp_backend {gloo/nccl/etc.}`
 
 ### Example
 

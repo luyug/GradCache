@@ -12,7 +12,8 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from pytorch_metric_learning.utils import distributed as pml_dist
 from pytorch_metric_learning.losses import SupConLoss
-from pl_gradcache import GradCache
+
+from grad_cache.pytorch_lightning.pl_gradcache import PLGradCache
 
 
 class RandomDataset(torch.utils.data.Dataset):
@@ -54,7 +55,7 @@ class SimpleLitModel(pl.LightningModule):
             self.trainer.strategy.precision_plugin.forward_context = nullcontext
 
         print(f"*** initializing gradcache with ddp_module={type(ddp_module)}, minibatch_size={self.params.gc_minibatch_size}")
-        self.gc = GradCache(
+        self.gc = PLGradCache(
             models=[ddp_module],
             chunk_sizes=self.params.gc_minibatch_size,
             loss_fn=self.calculate_loss,
@@ -168,6 +169,7 @@ def main(params):
     experiment_id = f"gpus-{params.gpus}_precision-{params.precision}"
     if params.use_gc:
         experiment_id += "_gc"
+    experiment_id += "_pl"
     wandb_logger = WandbLogger(
         project=params.project_name,
         name=experiment_id,
@@ -175,7 +177,7 @@ def main(params):
     ddp = DDPStrategy(process_group_backend=params.ddp_backend)
     trainer = pl.Trainer(
         accelerator="gpu" if params.gpus > 0 else "cpu",
-        strategy=ddp if params.gpus > 1 else None,
+        strategy=ddp if params.gpus > 1 else "auto",
         devices=params.gpus if params.gpus > 0 else "auto",
         precision=params.precision,
         logger=wandb_logger,
